@@ -17,59 +17,123 @@ This repository contains the analysis, metric formulas, processing scripts, and 
 
 ## 🧠 Theoretical Framework & Formulas
 
-To translate raw gameplay metrics into cognitive performance indicators, we designed five normalized rates (scaled to $0-100$) and a holistic **Overall Performance Score**.
+To translate raw gameplay metrics into cognitive performance indicators, we designed five normalized rates (scaled to `0 - 100`) and a holistic **Overall Performance Score**. To ensure universal rendering across all markdown viewers, all formulas are presented in plain-text code blocks.
+
+---
 
 ### 1. Accuracy Rate (0–100)
-* **Goal**: Measures how accurately the player interacts with valid targets while avoiding mistakes.
-* **Formula**:
-  $$\text{Accuracy Rate} = 100 \times \frac{\text{fruits\_sliced}}{\text{fruits\_sliced} + \text{fruits\_missed} + \text{bombs\_hit}}$$
-* **Cognitive Rationale**: This is modeled after the **Jaccard Index (Threat Score)**, which represents $\frac{\text{True Positives}}{\text{True Positives} + \text{False Negatives} + \text{False Positives}}$.
-  * **True Positives (TP)**: Slicing valid targets (`fruits_sliced`).
-  * **False Negatives (FN)**: Missing valid targets (`fruits_missed`).
-  * **False Positives (FP)**: Slicing invalid targets (`bombs_hit`).
-  * If a session has zero interactions, the score defaults to `0.0`.
+
+```
+Accuracy Rate = 100 * fruits_sliced / (fruits_sliced + fruits_missed + bombs_hit)
+```
+
+#### 📝 Formula Parameter Guide
+*   `fruits_sliced`: Successful hits on valid targets (True Positives).
+*   `fruits_missed`: Missed valid targets (False Negatives).
+*   `bombs_hit`: Hits on hazardous obstacles (False Positives).
+
+#### 💡 Cognitive Explanation & Justification
+*   **Cognitive Dimension**: Precision, Target Selection, and Attention Focus.
+*   **Justification**: This is modeled after the **Jaccard Index (Threat Score)**. In reaction-based assessments, a player's accuracy isn't just about how many targets they hit, but how well they avoid mistakes. Slicing a bomb or letting a fruit fall are both errors. This formula evaluates the player's ability to focus attention on valid targets (fruits) while filtering out noise (bombs) and staying responsive.
+*   **Boundary Handling**: If a session contains no interactions (`total_target = 0`), the formula safely defaults to `0.0` to avoid division-by-zero errors.
+
+---
 
 ### 2. Response Rate (0–100)
-* **Goal**: Measures how quickly and effectively the player responds to gameplay events.
-* **Formula**:
-  * $\text{Action Speed} = \frac{\text{fruits\_sliced} + \text{bombs\_dodged}}{\text{session\_duration\_seconds}}$
-  * $\text{Speed Score} = \min\left(100.0, 100.0 \times \frac{\text{Action Speed}}{2.5}\right)$
-  * $\text{Combo Score} = \min\left(100.0, 100.0 \times \frac{\text{max\_combo}}{50.0}\right)$
-  * $$\text{Response Rate} = 0.6 \times \text{Speed Score} + 0.4 \times \text{Combo Score}$$
-* **Cognitive Rationale**: Combines **raw speed** (correct physical interactions per second) and **strategic response efficacy** (combos represent planning and high-speed precision). 
-  * The dataset's empirical maximum speed is around $3.9$ actions/sec, with a median of $0.71$. A benchmark of $2.5$ actions/sec is set as the $100\%$ speed threshold, which filters out extreme outliers while rewarding fast play.
-  * `max_combo` is scaled relative to the game's empirical limit of $50$.
+
+```
+Action Speed = (fruits_sliced + bombs_dodged) / session_duration_seconds
+Speed Score = min(100.0, 100.0 * Action Speed / 2.5)
+Combo Score = min(100.0, 100.0 * max_combo / 50.0)
+
+Response Rate = 0.6 * Speed Score + 0.4 * Combo Score
+```
+
+#### 📝 Formula Parameter Guide
+*   `Action Speed`: The number of correct decisions (slices + dodges) made per second.
+*   `Speed Score`: Speed normalized against a high-performance benchmark of `2.5` actions per second.
+*   `Combo Score`: Highest streak achieved, normalized against a maximum benchmark of `50`.
+
+#### 💡 Cognitive Explanation & Justification
+*   **Cognitive Dimension**: Processing Speed, Motor Reflexes, and Sequence Planning.
+*   **Justification**: Speed alone can result in chaotic, error-prone play. By combining **physical response speed** (actions/second, 60% weight) with **coordinated accuracy** (max combo, 40% weight), we measure how *effectively* the child responds. Combos represent the ability to execute sequential responses rapidly without making mistakes.
+*   **Boundary Handling**: Normalized values are capped at `100.0` to prevent outliers from distorting the scale. Non-positive durations default to a speed score of `0.0`.
+
+---
 
 ### 3. Error Rate (0–100)
-* **Goal**: Measures the frequency and severity of mistakes.
-* **Formula**:
-  $$\text{Error Rate} = \min\left(100.0, 100.0 \times \frac{\text{fruits\_missed} + 3.0 \times \text{bombs\_hit}}{\text{fruits\_sliced} + \text{fruits\_missed} + \text{bombs\_hit} + \text{bombs\_dodged}}\right)$$
-* **Cognitive Rationale**: Slicing a bomb is a **critical failure** (leading to a lost life or instant game over) and is weighted $3\times$ heavier than simply letting a fruit drop (`fruits_missed`). 
-  * The total error is divided by the sum of all spawning events to represent frequency relative to opportunities, then scaled to $100$ and clipped.
+
+```
+Weighted Errors = fruits_missed + 3.0 * bombs_hit
+Total Objects   = fruits_sliced + fruits_missed + bombs_hit + bombs_dodged
+
+Error Rate = min(100.0, 100.0 * Weighted Errors / Total Objects)
+```
+
+#### 📝 Formula Parameter Guide
+*   `Weighted Errors`: Sum of mistakes, penalizing severe errors (bomb hits) three times more than standard mistakes (missed fruits).
+*   `Total Objects`: The sum of all active gameplay objects spawned during the session.
+
+#### 💡 Cognitive Explanation & Justification
+*   **Cognitive Dimension**: Inhibition Control and Risk Avoidance.
+*   **Justification**: Hitting a bomb in Fruit Ninja represents a **critical failure of inhibitory control** (failing to stop a motor action in response to a negative stimulus). Letting a fruit drop is a minor lapse in attention. Thus, bomb hits are weighted $3\times$ heavier. We divide this by the total spawned objects to reflect the frequency of errors relative to the total opportunities they had to make them.
+*   **Boundary Handling**: Capped at `100.0` to maintain scale integrity. Defaults to `0.0` if no objects are spawned.
+
+---
 
 ### 4. Persistence Rate (0–100)
-* **Goal**: Measures the player's willingness to continue and stay engaged despite challenges.
-* **Formula**:
-  * $\text{Retries Score} = 100.0 \times \frac{\text{retries}}{3.0}$
-  * $\text{Duration Score} = 100.0 \times \frac{\text{session\_duration\_seconds}}{300.0}$
-  * $\text{Pause Penalty} = 20.0 \times \frac{\text{pause\_count}}{5.0}$
-  * $$\text{Persistence Rate} = \max\left(0.0, \min\left(100.0, 0.5 \times \text{Retries Score} + 0.5 \times \text{Duration Score} - \text{Pause Penalty}\right)\right)$$
-* **Cognitive Rationale**: Focus and grit are demonstrated by restarting the session (`retries`, max 3) and spending more time in-session (`duration`, max 300s). Frequent pausing breaks focus and task flow, and is penalized up to 20 points.
+
+```
+Retries Score  = 100.0 * retries / 3.0
+Duration Score = 100.0 * session_duration_seconds / 300.0
+Pause Penalty  = 20.0 * pause_count / 5.0
+
+Persistence Rate = max(0.0, min(100.0, 0.5 * Retries Score + 0.5 * Duration Score - Pause Penalty))
+```
+
+#### 📝 Formula Parameter Guide
+*   `retries`: Number of times the player restarted the session (maximum of `3`).
+*   `session_duration_seconds`: Total active gameplay duration, scaled against a maximum of `300` seconds (5 minutes).
+*   `pause_count`: Number of times the user paused, penalizing the score by up to `20` points.
+
+#### 💡 Cognitive Explanation & Justification
+*   **Cognitive Dimension**: Task Engagement, Grit, and Attention Span.
+*   **Justification**: Children who retry the game after failing and play for longer sessions demonstrate **higher persistence and intrinsic motivation**. In contrast, frequent pausing suggests a disruption in focus, distraction, or fatigue. Therefore, retries and duration are rewarded (50% weight each), while pauses incur a penalty.
+*   **Boundary Handling**: Bounded strictly within `[0.0, 100.0]` using clipping functions.
+
+---
 
 ### 5. Consistency Rate (0–100)
-* **Goal**: Measures how stable and reliable the player's performance remains.
-* **Formula**:
-  * $\text{Combo Consistency} = \min\left(100.0, 100.0 \times \frac{\text{max\_combo}}{\text{fruits\_sliced}}\right)$
-  * $\text{Stability Score} = 100.0 - \text{Error Rate}$
-  * $\text{Pause Penalty} = 20.0 \times \frac{\text{pause\_count}}{5.0}$
-  * $$\text{Consistency Rate} = \max\left(0.0, \min\left(100.0, 0.5 \times \text{Combo Consistency} + 0.5 \times \text{Stability Score} - \text{Pause Penalty}\right)\right)$$
-* **Cognitive Rationale**: A consistent player maintains high flow. This is captured by the ratio of their largest streak to total hits. Consistency is enhanced by maintaining a low error rate (`Stability Score`) and degraded by frequent interruptions (`Pause Penalty`).
+
+```
+Combo Consistency = min(100.0, 100.0 * max_combo / fruits_sliced)
+Stability Score   = 100.0 - Error Rate
+Pause Penalty     = 20.0 * pause_count / 5.0
+
+Consistency Rate = max(0.0, min(100.0, 0.5 * Combo Consistency + 0.5 * Stability Score - Pause Penalty))
+```
+
+#### 📝 Formula Parameter Guide
+*   `Combo Consistency`: Ratio of the longest streak to total successful slices.
+*   `Stability Score`: The inverse of the error rate, representing overall error avoidance.
+*   `pause_count`: Pausing frequency, representing a break in flow consistency.
+
+#### 💡 Cognitive Explanation & Justification
+*   **Cognitive Dimension**: Sustained Focus and Cognitive Stability.
+*   **Justification**: Consistency evaluates the stability of the player's performance. A player who maintains a high combo relative to their total slices is in a **steady flow state**, slicing continuously without interruption. A player who hits bombs or pauses frequently is exhibiting unstable, erratic behavior. 
+*   **Boundary Handling**: If `fruits_sliced` is 0, the combo consistency defaults to `0.0`. The final score is clipped between `0` and `100`.
+
+---
 
 ### 6. Overall Performance Score (0–100)
-* **Formula**:
-  $$\text{Overall Score} = 0.30 \times \text{Accuracy} + 0.25 \times \text{Response} + 0.15 \times (100 - \text{Error Rate}) + 0.15 \times \text{Persistence} + 0.15 \times \text{Consistency}$$
-* **Cognitive Rationale**: The overall score prioritizes precision (Accuracy: 30%) and speed/combo coordination (Response: 25%), with error avoidance (15%), persistence (15%), and consistency (15%) acting as supporting pillars.
-  * **Note**: In a real session, a perfect score of $100.0$ is a theoretical upper bound (requiring 0 mistakes, maximum speed, 3 retries, and no pauses). Due to natural trade-offs (e.g., higher persistence duration reduces speed rate), the maximum observed score in the dataset is $82.26$.
+
+```
+Overall Score = 0.30 * Accuracy Rate + 0.25 * Response Rate + 0.15 * (100.0 - Error Rate) + 0.15 * Persistence Rate + 0.15 * Consistency Rate
+```
+
+#### 💡 Cognitive Explanation & Justification
+*   **Justification**: Calculates a single holistic index of the child's gameplay performance. Weighting prioritizes core cognitive indicators: Precision/Attention (Accuracy: 30%) and Speed/Timing (Response: 25%), while giving equal weight (15% each) to error avoidance, persistence, and flow consistency.
+*   **Statistical Note**: In practice, a score of `100` represents a theoretical perfect play across all dimensions (0 errors, maximum speed, 3 retries, and no pauses). Due to natural trade-offs (e.g., retrying and playing longer reduces average speed), the maximum empirical score observed in the dataset is `82.26`.
 
 ---
 
